@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { ref, get, push, update } from "firebase/database";
+import { ref, get, push, update, remove } from "firebase/database";
 import { db } from "../firebase";
 
 const QRScanner = () => {
-  const scannerRef = useRef(null);
   const html5QrCodeRef = useRef(null);
   const isScanningRef = useRef(false);
 
@@ -25,7 +24,6 @@ const QRScanner = () => {
             await html5QrCodeRef.current.stop();
             isScanningRef.current = false;
 
-            // 🔄 In Firebase speichern oder Status ändern
             const tasksRef = ref(db, "tasks");
             const snapshot = await get(tasksRef);
             const data = snapshot.val();
@@ -43,16 +41,18 @@ const QRScanner = () => {
             }
 
             if (foundKey) {
-              let nextStatus = "done";
-              if (foundTask.status === "todo") nextStatus = "inProgress";
-              if (foundTask.status === "inProgress") nextStatus = "done";
-
-              await update(ref(db, `tasks/${foundKey}`), { status: nextStatus });
+              if (foundTask.status === "todo") {
+                await update(ref(db, `tasks/${foundKey}`), { status: "inProgress" });
+              } else if (foundTask.status === "inProgress") {
+                await update(ref(db, `tasks/${foundKey}`), { status: "done" });
+              } else if (foundTask.status === "done") {
+                await remove(ref(db, `tasks/${foundKey}`));
+              }
             } else {
               await push(tasksRef, { title: decodedText, status: "todo" });
             }
 
-            // Nach kurzem Delay Scanner neu starten
+            // Scanner nach kurzem Delay neu starten
             setTimeout(() => {
               startScanner();
             }, 1500);
@@ -62,7 +62,7 @@ const QRScanner = () => {
           }
         );
       } catch (err) {
-        console.error(err);
+        console.error("🚫 Fehler beim Starten des Scanners:", err);
       }
     };
 
@@ -85,5 +85,3 @@ const QRScanner = () => {
 };
 
 export default QRScanner;
-
-
